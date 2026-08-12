@@ -345,6 +345,13 @@ function ensureColumn(db: SqliteAdapter, tableName: string, columnName: string, 
   }
 }
 
+function hasProvider(db: SqliteAdapter, providerId: string): boolean {
+  const row = db
+    .prepare("SELECT provider FROM provider_connections WHERE provider = ? LIMIT 1")
+    .get(providerId) as { provider?: string } | undefined;
+  return Boolean(row?.provider);
+}
+
 function isSchemaAlreadyApplied(
   db: SqliteAdapter,
   migration: { version: string; name: string }
@@ -487,6 +494,13 @@ function isSchemaAlreadyApplied(
       // but still burn a version-tracking slot mismatch — guard it the same
       // way as the other renumbers for consistency.
       return hasTable(db, "connection_runtime_state");
+    case "155":
+      // Retroactive guard for the windsurf_to_devin_desktop migration renumbered
+      // 151 -> 155 (collided with 151_quota_packages on merge). DBs that already
+      // applied this under the old 151 number have the devin-desktop provider,
+      // and the UPDATE operations are idempotent — but we skip to avoid the
+      // DELETE from windsurf rows which are already gone.
+      return hasProvider(db, "devin-desktop");
     default:
       return false;
   }
